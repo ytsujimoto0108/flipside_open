@@ -146,30 +146,6 @@ def write_csv(path: Path, fieldnames: Sequence[str], rows: Sequence[Dict[str, st
         writer.writerows(rows)
 
 
-def compare_with_legacy(
-    final_rows: Sequence[Dict[str, str]],
-    legacy_rows: Sequence[Dict[str, str]],
-) -> List[Dict[str, str]]:
-    """Create an optional audit comparison with the original screening matches."""
-    final_by_key = index_unique(final_rows, "final matches")
-    legacy_by_key = index_unique(legacy_rows, "legacy matches")
-    comparison_rows: List[Dict[str, str]] = []
-    for key in sorted(set(final_by_key) | set(legacy_by_key)):
-        if key in final_by_key and key in legacy_by_key:
-            status = "common"
-            source = final_by_key[key]
-        elif key in final_by_key:
-            status = "added_in_final"
-            source = final_by_key[key]
-        else:
-            status = "removed_from_final"
-            source = legacy_by_key[key]
-        row = {field: source.get(field, "") for field in MATCH_FIELDS}
-        row["comparison_status"] = status
-        comparison_rows.append(row)
-    return comparison_rows
-
-
 def main() -> None:
     """Parse command-line arguments and write final screening datasets."""
     repo_root = Path(__file__).resolve().parent.parent
@@ -194,11 +170,7 @@ def main() -> None:
         type=Path,
         default=repo_root / "data" / "screening_audit_v2.csv",
     )
-    parser.add_argument("--legacy-matches", type=Path)
-    parser.add_argument("--comparison-output", type=Path)
     args = parser.parse_args()
-    if bool(args.legacy_matches) != bool(args.comparison_output):
-        parser.error("--legacy-matches and --comparison-output must be used together")
 
     candidate_fields, candidate_rows = read_csv(
         args.candidates,
@@ -225,21 +197,6 @@ def main() -> None:
     print(f"Wrote {len(audit_rows)} audit rows to {args.audit_output}")
     print("Automatic decisions:", automatic_counts)
     print("Manual decisions:", manual_counts)
-
-    if args.legacy_matches:
-        _, legacy_rows = read_csv(args.legacy_matches, required_fields=MATCH_FIELDS)
-        comparison_rows = compare_with_legacy(final_rows, legacy_rows)
-        write_csv(
-            args.comparison_output,
-            MATCH_FIELDS + ["comparison_status"],
-            comparison_rows,
-        )
-        comparison_counts: Dict[str, int] = {}
-        for row in comparison_rows:
-            status = row["comparison_status"]
-            comparison_counts[status] = comparison_counts.get(status, 0) + 1
-        print(f"Wrote legacy comparison to {args.comparison_output}")
-        print("Legacy comparison:", comparison_counts)
 
 
 if __name__ == "__main__":

@@ -10,17 +10,6 @@ from datetime import datetime
 from typing import Dict, Iterator, List, Optional, Tuple, Set
 
 
-# Legacy patterns used to reproduce the original screening dataset.
-KEYWORDS = ["death", "mortality", "fatality", "alive", "survival"]
-KEYWORD_PATTERN = re.compile(r"(?i)\b(" + "|".join(map(re.escape, KEYWORDS)) + r")\b")
-COMPOSITE_PATTERN = re.compile(
-    r"(composite|morbidity|serious adverse|sae).*?(death|mortality|fatality|alive|survival)"
-    r"|(death|mortality|fatality|alive|survival).*?(morbidity|composite|serious adverse|sae)"
-    r"|(death|mortality|fatality|alive|survival).*( or | and |/).+"
-    r"|.+( or | and |/).*(death|mortality|fatality|alive|survival)",
-    flags=re.IGNORECASE,
-)
-
 # V2 expands only unambiguous lexical forms. "fatal" and "survivor(s)" are
 # intentionally omitted because they commonly describe non-fatal outcomes or
 # outcomes measured only among survivors.
@@ -254,162 +243,6 @@ def iter_v2_candidates(path: Path) -> Iterator[Dict[str, object]]:
         }
 
 
-def iter_keyword_outcomes(path: Path, stats: Dict[str, int], included_files: Set[Path]) -> Iterator[Dict[str, str]]:
-    """Yield outcomes from one rm5 file that match the keyword and use OR/RR. Update stats in-place."""
-    context = ET.iterparse(path, events=("start", "end"))
-    _, root = next(context)  # grab root element
-    review_id = root.attrib.get("ID", "")
-    review_type = (root.attrib.get("TYPE") or "").upper()
-    review_title = None
-
-    # Exclude non-intervention reviews up-front.
-    if review_type and review_type != "INTERVENTION":
-        stats["files_non_intervention"] += 1
-        root.clear()
-        return
-
-    for event, elem in context:
-        if event != "end":
-            continue
-
-        if elem.tag == "TITLE" and review_title is None:
-            review_title = clean_text("".join(elem.itertext()))
-        elif elem.tag == "DICH_OUTCOME":
-            stats["meta_entries_total"] += 1
-            measure = (elem.attrib.get("EFFECT_MEASURE") or "").upper()
-            estimable = (elem.attrib.get("ESTIMABLE") or "").upper() == "YES"
-
-            if measure not in {"OR", "RR"} or not estimable:
-                stats["excluded_not_or_rr_or_not_estimable"] += 1
-                elem.clear()
-                continue
-
-            outcome_name = (elem.findtext("NAME") or "").strip()
-
-            # Inclusion: outcome name contains a keyword.
-            if not KEYWORD_PATTERN.search(outcome_name):
-                stats["excluded_no_keyword"] += 1
-                elem.clear()
-                continue
-
-            # Exclusion: death/survival only as part of a composite outcome.
-            if COMPOSITE_PATTERN.search(outcome_name):
-                stats["excluded_composite"] += 1
-                elem.clear()
-                continue
-
-            # Exclusion: cannot extract 2x2 (missing events/totals).
-            data_nodes = elem.findall("DICH_DATA")
-            has_2x2 = any(
-                all(
-                    node.attrib.get(attr) not in {None, ""}
-                    for attr in ("EVENTS_1", "EVENTS_2", "TOTAL_1", "TOTAL_2")
-                )
-                for node in data_nodes
-            )
-            if not has_2x2:
-                stats["excluded_missing_2x2"] += 1
-                elem.clear()
-                continue
-
-            # Exclusion: meta-analysis with 0 or 1 study.
-            num_studies_attr = elem.attrib.get("STUDIES")
-            try:
-                num_studies = int(num_studies_attr) if num_studies_attr is not None else len(data_nodes)
-            except ValueError:
-                num_studies = len(data_nodes)
-            if num_studies <= 1:
-                stats["excluded_num_studies_le1"] += 1
-                elem.clear()
-                continue
-            stats["meta_analyses_total"] += 1
-
-            stats["included_meta_analyses"] += 1
-
-            if path not in included_files:
-                included_files.add(path)
-                stats["files_with_included_meta"] += 1
-
-            yield {
-                "rm5_file": path.name,
-                "review_id": review_id,
-                "review_title": review_title or "",
-                "comparison_id": elem.attrib.get("ID", ""),
-                "effect_measure": measure,
-                "outcome_name": outcome_name,
-            }
-
-            elem.clear()
-
-    root.clear()
-
-
-def main_legacy() -> None:
-    repo_root = Path(__file__).resolve().parent.parent
-    rm5_dir = repo_root / "data" / "rm5"
-    output_path = repo_root / "data" / "screening_matches.csv"
-
-    stats: Dict[str, int] = {
-        "files_total": 0,
-        "files_outdated": 0,
-        "files_non_intervention": 0,
-        "files_included": 0,
-        "files_with_included_meta": 0,
-        "meta_entries_total": 0,
-        "meta_analyses_total": 0,
-        "excluded_not_or_rr_or_not_estimable": 0,
-        "excluded_no_keyword": 0,
-        "excluded_composite": 0,
-        "excluded_missing_2x2": 0,
-        "excluded_num_studies_le1": 0,
-        "included_meta_analyses": 0,
-    }
-
-    # Pass 1: resolve latest version per DOI base (pub number), fallback to title/modified.
-    all_rm5_files = sorted(rm5_dir.glob("*.rm5"))
-    stats["files_total"] = len(all_rm5_files)
-    latest_files = select_latest_files(rm5_dir)
-
-    # Pass 2: iterate only latest files.
-    rows: List[Dict[str, str]] = []
-    included_files: Set[Path] = set()
-    for rm5_file in all_rm5_files:
-        if rm5_file not in latest_files:
-            stats["files_outdated"] += 1
-            continue
-        stats["files_included"] += 1
-        rows.extend(iter_keyword_outcomes(rm5_file, stats, included_files))
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = ["rm5_file", "review_id", "review_title", "comparison_id", "effect_measure", "outcome_name"]
-    with output_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        cleaned_rows = [
-            {k: clean_text(v) if isinstance(v, str) else v for k, v in row.items()}
-            for row in rows
-        ]
-        writer.writerows(cleaned_rows)
-
-    print(f"Wrote {len(rows)} outcomes to {output_path}")
-    print("---- Screening summary ----")
-    print(f"Number of rm5 files: {stats['files_total']}")
-    print(f"Number of rm5 files excluded because review type is not intervention: {stats['files_non_intervention']}")
-    print("Number of rm5 files included only randomized controlled trials (RCTs): N/A (not encoded in rm5 files)")
-    print(f"Number of rm5 files excluded due to not up-to-date reviews: {stats['files_outdated']}")
-    print(f"Number of rm5 files included: {stats['files_included']}")
-    print(f"Number of rm5 files that contributed at least one included meta-analysis: {stats['files_with_included_meta']}")
-    print(f"Number of dichotomous outcomes encountered: {stats['meta_entries_total']}")
-    print(f"Number of meta-analyses (dichotomous outcomes with >1 study): {stats['meta_analyses_total']}")
-    print("Exclusions (hierarchical):")
-    print(f"  Not OR/RR or not estimable: {stats['excluded_not_or_rr_or_not_estimable']}")
-    print(f"  Keyword mismatch: {stats['excluded_no_keyword']}")
-    print(f"  Composite outcome: {stats['excluded_composite']}")
-    print(f"  Missing 2x2 table: {stats['excluded_missing_2x2']}")
-    print(f"  Num studies <= 1: {stats['excluded_num_studies_le1']}")
-    print(f"Number of meta-analyses included: {stats['included_meta_analyses']}")
-
-
 CANDIDATE_FIELDS = [
     "rm5_file",
     "review_id",
@@ -518,15 +351,7 @@ def main() -> None:
         default=repo_root / "data" / "screening_adjudication_template_v2.csv",
         help="output path for the blank manual-adjudication template",
     )
-    parser.add_argument(
-        "--legacy",
-        action="store_true",
-        help="reproduce the original screening_matches.csv workflow",
-    )
     args = parser.parse_args()
-    if args.legacy:
-        main_legacy()
-        return
     run_screening(
         args.rm5_dir,
         args.candidate_output,
