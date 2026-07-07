@@ -1,0 +1,13 @@
+# OS / editor clutter
+.DS_Store
+.Rhistory
+.Rproj.user/
+
+# R
+.Rdata
+renv/library/
+renv/staging/
+
+# Python
+__pycache__/
+*.pyc

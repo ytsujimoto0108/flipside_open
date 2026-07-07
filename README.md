@@ -21,7 +21,7 @@ data/rm5/*.rm5
   +-- scripts/extract_meta_data.py      -> meta_analyses_extracted.csv, meta_analysis_studies.csv
         |
         +-- scripts/main_analysis.R (sources cer_helpers.R)
-        |     -> primary_analysis_results.csv, primary_analysis_summary.md
+        |     -> primary_analysis_results.csv
         +-- scripts/analyze_meta_characteristics.R -> meta_characteristics_summary.csv/.md (Table 1)
         +-- scripts/subgroup_analysis_rrr.R        -> subgroup_rrr_summary.csv (Figure 4)
         +-- scripts/export_table2_summary.R        -> table2_summary.csv (Table 2)
@@ -123,11 +123,9 @@ comparison.
   continuity correction and double-zero omission, computes the reciprocal
   flipped RR (RRf), the ratio of risk ratios (RRR), statistical significance
   and CI-ratio changes, and GRADE imprecision before and after flipping.
-  Output: `primary_analysis_results.csv` (the per-meta-analysis results
-  table that every downstream R script reads) and
-  `primary_analysis_summary.md`, plus draft versions of the scatter,
-  histogram, and Bland-Altman plots later superseded by the dedicated figure
-  scripts below.
+  Output: `primary_analysis_results.csv`, the per-meta-analysis results table
+  that every downstream R script (Table 2, Figures 2-4, Supplementary Figure
+  S1, and the post-hoc OR analysis) reads.
 - **`scripts/export_table2_summary.R`** — Reads
   `primary_analysis_results.csv` and summarizes the primary-analysis results
   (significance changes, CI narrowing, GRADE imprecision changes, RRR)

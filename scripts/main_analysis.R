@@ -6,9 +6,7 @@
 
 suppressPackageStartupMessages({
   library(meta)      # metabin(), MH random-effects
-  library(ggplot2)
   library(dplyr)
-  library(scales)
 })
 
 # Resolve project root robustly for both `Rscript` and interactive source().
@@ -272,103 +270,14 @@ write.csv(res, results_csv, row.names = FALSE)
 message("  Wrote: ", results_csv)
 
 
-# ── Supplementary Figure S1: Bland-Altman plot on log scale ───────────────────
-today_str <- format(Sys.Date(), "%Y-%m-%d")
-
-plot_df <- res %>%
-  mutate(
-    log_rr_orig     = log(rr_orig),
-    log_rr_flip_re  = log(rr_flip_re),
-    mean_log_rr     = (log_rr_orig + log_rr_flip_re) / 2,
-    diff_log_rrr    = log_rr_flip_re - log_rr_orig # equals log(RRR)
-  ) %>%
-  filter(is.finite(mean_log_rr), is.finite(diff_log_rrr))
-
-bias <- mean(plot_df$diff_log_rrr, na.rm = TRUE)
-sd_diff <- sd(plot_df$diff_log_rrr, na.rm = TRUE)
-loa_lo <- bias - 1.96 * sd_diff
-loa_hi <- bias + 1.96 * sd_diff
-
-fig_ba <- ggplot(plot_df, aes(x = mean_log_rr, y = diff_log_rrr)) +
-  geom_hline(yintercept = 0, colour = "grey40", linewidth = 0.6, linetype = "dashed") +
-  geom_hline(yintercept = bias, colour = "firebrick", linewidth = 0.7) +
-  geom_hline(yintercept = loa_lo, colour = "#2166ac", linewidth = 0.7, linetype = "dotted") +
-  geom_hline(yintercept = loa_hi, colour = "#2166ac", linewidth = 0.7, linetype = "dotted") +
-  geom_point(alpha = 0.25, size = 1.2, colour = "#2c7bb6") +
-  labs(
-    x = "Mean of log(RRo) and log(RRf)",
-    y = "log(RRR)",
-    title = paste0("Bland-Altman plot for pooled RR (", today_str, ")"),
-    subtitle = sprintf("Bias = %.3f; LoA = [%.3f, %.3f]", bias, loa_lo, loa_hi),
-    caption = "RRR = RRf / RRo; RRo = original pooled RR; RRf = reciprocal of flipped pooled RR"
-  ) +
-  theme_bw(base_size = 12) +
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5, colour = "grey40"),
-        plot.caption = element_text(colour = "grey35"))
-
-ba_path <- file.path(out_dir, paste0("fig_bland_altman_logrr_", format(Sys.Date(), "%Y%m%d"), ".svg"))
-ggsave(ba_path, fig_ba, width = 7, height = 5)
-message("  Wrote: ", ba_path)
-
-
-# ── Figure 2: Scatter plot of log(RRf) vs log(RRo) ────────────────────────────
-ax_lim <- range(c(plot_df$log_rr_orig, plot_df$log_rr_flip_re), na.rm = TRUE)
-ax_lim <- c(floor(ax_lim[1]), ceiling(ax_lim[2]))
-
-fig_scatter <- ggplot(plot_df, aes(x = log_rr_orig, y = log_rr_flip_re)) +
-  geom_abline(slope = 1, intercept = 0, colour = "firebrick", linewidth = 0.7,
-              linetype = "dashed") +
-  geom_point(alpha = 0.25, size = 1.2, colour = "#2c7bb6") +
-  coord_fixed(xlim = ax_lim, ylim = ax_lim) +
-  labs(
-    x = "log(RRo)",
-    y = "log(RRf)",
-    title = paste0("log(RRf) vs log(RRo) (", today_str, ")"),
-    subtitle = "Dashed line = identity (y = x); points above the line indicate RRf > RRo",
-    caption = "RRo = original pooled RR; RRf = reciprocal of flipped pooled RR"
-  ) +
-  theme_bw(base_size = 12) +
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5, colour = "grey40"),
-        plot.caption = element_text(colour = "grey35"))
-
-scatter_path <- file.path(out_dir, paste0("fig_scatter_logrr_vs_logrro_", format(Sys.Date(), "%Y%m%d"), ".svg"))
-ggsave(scatter_path, fig_scatter, width = 6, height = 6)
-message("  Wrote: ", scatter_path)
-
-
-# ── Figure 3: Histogram of RRR (ratio of risk ratios) ────────────────────────
+# ── Summary statistics (printed) ──────────────────────────────────────────────
+# Figures 2, 3, and Supplementary Figure S1 are produced by the dedicated
+# fig2_rr_or_scatter_panels.R / fig3_rrr_ror_hist_panels.R /
+# fig_bland_altman_logrr.R scripts, which read primary_analysis_results.csv.
+# Table 2 is produced by export_table2_summary.R from the same file.
 rrr_df <- res %>%
   filter(is.finite(rrr), rrr > 0)
 
-fig_hist <- ggplot(rrr_df, aes(x = rrr)) +
-  geom_vline(xintercept = 1, colour = "firebrick", linewidth = 0.7,
-             linetype = "dashed") +
-  geom_histogram(fill = "#2c7bb6", colour = "white",
-                 alpha = 0.8) +
-  scale_x_log10(
-    breaks = scales::breaks_log(n = 10),
-    labels = scales::label_number(accuracy = 0.1, trim = TRUE)
-  ) +
-  labs(
-    x     = "Log(RRR)",
-    y     = "Count",
-    title = paste0("Distribution of ratio of risk ratios (RRR) (", today_str, ")"),
-    subtitle = "Dashed line at 1 = no difference between orientations",
-    caption = "RRR = RRf / RRo; RRo = original pooled RR; RRf = reciprocal of flipped pooled RR"
-  ) +
-  theme_bw(base_size = 12) +
-  theme(plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5, colour = "grey40"),
-        plot.caption = element_text(colour = "grey35"))
-
-hist_path <- file.path(out_dir, paste0("fig_hist_rrr_", format(Sys.Date(), "%Y%m%d"), ".svg"))
-ggsave(hist_path, fig_hist, width = 7, height = 5)
-message("  Wrote: ", hist_path)
-
-
-# ── Summary statistics (printed) ──────────────────────────────────────────────
 message("\n── Summary ──")
 message(sprintf("  Median RRR: %.2f  [IQR: %.2f, %.2f]",
   median(rrr_df$rrr, na.rm = TRUE),
@@ -395,90 +304,6 @@ message(sprintf("    Non-significant -> significant: %s", fmt_n_pct(sig_up, nrow
 message(sprintf("    Significant -> non-significant: %s", fmt_n_pct(sig_down, nrow(res))))
 message(sprintf("    95%% CI narrowed after flipping: %s", fmt_n_pct(ci_narrowed_n, nrow(res))))
 
-summary_md <- file.path(out_dir, "primary_analysis_summary.md")
-grade_increase <- sum(res$grade_imp_diff > 0, na.rm = TRUE)
-grade_decrease <- sum(res$grade_imp_diff < 0, na.rm = TRUE)
-grade_same <- sum(res$grade_imp_diff == 0, na.rm = TRUE)
-
-class_order <- c("mortality", "survival")
-class_labels <- c(mortality = "Mortality", survival = "Survival")
-table2_rows <- lapply(class_order, function(cls) {
-  sub <- res[res$outcome_class == cls, , drop = FALSE]
-  c(
-    N = nrow(sub),
-    sig_changed = fmt_n_pct(sum(sub$sig_orig != sub$sig_flip, na.rm = TRUE), nrow(sub)),
-    sig_up = fmt_n_pct(sum(sub$sig_change == "non-significant_to_significant", na.rm = TRUE), nrow(sub)),
-    sig_down = fmt_n_pct(sum(sub$sig_change == "significant_to_non-significant", na.rm = TRUE), nrow(sub)),
-    ci_narrowed = fmt_n_pct(sum(sub$ci_narrowed, na.rm = TRUE), nrow(sub)),
-    grade_changed = fmt_n_pct(sum(sub$grade_imp_orig != sub$grade_imp_flip, na.rm = TRUE), nrow(sub)),
-    grade_increase = fmt_n_pct(sum(sub$grade_imp_diff > 0, na.rm = TRUE), nrow(sub)),
-    grade_decrease = fmt_n_pct(sum(sub$grade_imp_diff < 0, na.rm = TRUE), nrow(sub)),
-    grade_diff = sprintf("%.0f (%.0f to %.0f)",
-      median(sub$grade_imp_diff, na.rm = TRUE),
-      quantile(sub$grade_imp_diff, 0.25, na.rm = TRUE),
-      quantile(sub$grade_imp_diff, 0.75, na.rm = TRUE)),
-    rrr = sprintf("%.2f (%.2f to %.2f)",
-      median(sub$rrr, na.rm = TRUE),
-      quantile(sub$rrr, 0.25, na.rm = TRUE),
-      quantile(sub$rrr, 0.75, na.rm = TRUE))
-  )
-})
-names(table2_rows) <- class_order
-
-summary_lines <- c(
-  "# Primary analysis summary",
-  "",
-  sprintf("- Estimable meta-analyses: %d", nrow(res)),
-  sprintf("- Median RRR: %.2f [IQR %.2f to %.2f]",
-          median(rrr_df$rrr, na.rm = TRUE),
-          quantile(rrr_df$rrr, 0.25, na.rm = TRUE),
-          quantile(rrr_df$rrr, 0.75, na.rm = TRUE)),
-  sprintf("- Statistical significance changed between original and flipped-only analyses: %s",
-          fmt_n_pct(sig_changed, nrow(res))),
-  sprintf("- Non-significant to significant: %s",
-          fmt_n_pct(sig_up, nrow(res))),
-  sprintf("- Significant to non-significant: %s",
-          fmt_n_pct(sig_down, nrow(res))),
-  sprintf("- 95%% CI narrowed after flipping: %s",
-          fmt_n_pct(ci_narrowed_n, nrow(res))),
-  sprintf("- GRADE imprecision changed between original and flipped-only analyses: %s",
-          fmt_n_pct(changed_grade, nrow(res))),
-  sprintf("- GRADE imprecision increased after flipping: %s",
-          fmt_n_pct(grade_increase, nrow(res))),
-  sprintf("- GRADE imprecision decreased after flipping: %s",
-          fmt_n_pct(grade_decrease, nrow(res))),
-  sprintf("- GRADE imprecision unchanged: %s",
-          fmt_n_pct(grade_same, nrow(res))),
-  sprintf("- Median GRADE imprecision difference (flip - original): %.2f [IQR %.2f to %.2f]",
-          median(res$grade_imp_diff, na.rm = TRUE),
-          quantile(res$grade_imp_diff, 0.25, na.rm = TRUE),
-          quantile(res$grade_imp_diff, 0.75, na.rm = TRUE)),
-  "",
-  "## Table 2",
-  "",
-  "Table 2. Primary analysis results stratified by original outcome orientation.",
-  "",
-  sprintf("| Original measure | %s | %s |",
-          class_labels["mortality"], class_labels["survival"]),
-  "| :------------------------------- | ------------------: | ------------------: |",
-  sprintf("| N | %s | %s |", table2_rows$mortality["N"], table2_rows$survival["N"]),
-  sprintf("| Statistical significance changed | %s | %s |", table2_rows$mortality["sig_changed"], table2_rows$survival["sig_changed"]),
-  sprintf("| Non-significant to significant | %s | %s |", table2_rows$mortality["sig_up"], table2_rows$survival["sig_up"]),
-  sprintf("| Significant to non-significant | %s | %s |", table2_rows$mortality["sig_down"], table2_rows$survival["sig_down"]),
-  sprintf("| 95%% CI narrowed after flipping | %s | %s |", table2_rows$mortality["ci_narrowed"], table2_rows$survival["ci_narrowed"]),
-  sprintf("| GRADE imprecision changed | %s | %s |", table2_rows$mortality["grade_changed"], table2_rows$survival["grade_changed"]),
-  sprintf("| GRADE improved after flipping | %s | %s |", table2_rows$mortality["grade_increase"], table2_rows$survival["grade_increase"]),
-  sprintf("| GRADE worsened after flipping | %s | %s |", table2_rows$mortality["grade_decrease"], table2_rows$survival["grade_decrease"]),
-  sprintf("| Median GRADE diff (IQR) | %s | %s |", table2_rows$mortality["grade_diff"], table2_rows$survival["grade_diff"]),
-  sprintf("| Median RRR (IQR) | %s | %s |", table2_rows$mortality["rrr"], table2_rows$survival["rrr"]),
-  "",
-  "## Figures",
-  "",
-  sprintf("![Bland-Altman plot for pooled RR](%s)", basename(ba_path)),
-  "",
-  sprintf("![Histogram of RRR](%s)", basename(hist_path))
-)
-writeLines(summary_lines, summary_md)
-message("  Wrote: ", summary_md)
-
-message("\n── 3.6.1 complete. Run scripts/subgroup_analysis_rrr.R for 3.6.2. ──")
+message("\n── 3.6.1 complete. Run scripts/subgroup_analysis_rrr.R for 3.6.2, ",
+        "scripts/export_table2_summary.R for Table 2, and the fig*.R scripts ",
+        "for Figures 2/3 and Supplementary Figure S1. ──")
