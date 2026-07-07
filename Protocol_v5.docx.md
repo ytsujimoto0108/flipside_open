@@ -49,9 +49,7 @@ This will be a meta-epidemiological study based on a cohort of Cochrane systemat
 We will include Cochrane systematic reviews from its inception to September 30, 2022 that meet the following criteria:
 
 * **Type of studies:** The review includes only randomized controlled trials (RCTs).
-
 * **Version of review:** We only include the most recent version of the reviews when one or more updates are available.
-
 * **Type of analysis and outcome:** A pair-wise meta-analysis using a risk ratio (RR) or odds ratio (OR) is performed for a dichotomous outcome related to “death” or “survival”. Other complementary dichotomous outcome pairs, such as response and non-response, will not be included.
 
 #### *3.2.2. Exclusion Criteria*
@@ -59,9 +57,7 @@ We will include Cochrane systematic reviews from its inception to September 30, 
 We will exclude reviews or meta-analyses if any of the following criteria are met:
 
 * Meta-analyses where “death” is reported as only part of a composite outcome will be excluded.
-
 * Meta-analyses where it is not possible to extract the 2x2 table for the relevant “death” or “survival” outcome from the meta-analysis.
-
 * Reviews that the statistical data cannot be downloaded from the Cochrane library.
 
 ### 3.3. Data source
@@ -90,7 +86,7 @@ Original analysis: use the 2x2 data according to the event definition encoded fo
 
 To handle single-zero studies, a continuity correction adding 0.5 to all four cells in 2x2 tables will be applied. Double-zero studies will be omitted from the analyses. This model was chosen because it is one of the most commonly used methods for Cochrane reviews and is implemented in Cochrane’s Review Manager (RevMan) software (Deeks, Higgins, and Altman 2022; Tsujimoto et al. 2024).
 
-We will then compare the statistical significance, precision and GRADE imprecision rating between original and flipped analyses. To evaluate changes in precision, we will compare the ratio of the upper to the lower limit of the 95% confidence interval for each pooled estimate in the original and flipped analyses. Following GRADE guidance on contextualised certainty ratings, we will transform pooled RR estimates and 95% CIs into absolute risk differences using the corresponding control event rate (Schünemann et al. 2022). For this GRADE-focused evaluation, we will compare (a) the original analysis and (b) the flipped-only analysis (i.e., using the flipped RR directly, without reciprocal re-expression). The control event rate for each meta-analysis will be estimated using a random-effects binomial-normal generalized linear mixed model with a logit link, fitted to the study-specific control-group event counts and denominators for the corresponding outcome definition. If this proportion meta-analysis fails to converge or cannot be estimated because of degenerate data, we will use the aggregate control event rate, calculated as the total number of events divided by the total number of participants in the control groups. We will benchmark these absolute effects against the GRADE thresholds of 12, 34, and 67 events per 1000 persons, which mark the transitions between trivial, small, moderate, and large effects (Wiercioch et al. 2025). For each orientation, we will count how many thresholds are crossed by the ARD 95% CI, then compare these counts and summarize their difference (flipped minus original).
+We will then compare the statistical significance, precision and GRADE imprecision rating between original and flipped analyses. To evaluate changes in precision, we will compare the ratio of the upper to the lower limit of the 95% confidence interval for each pooled estimate in the original and flipped analyses. Following GRADE guidance on contextualised certainty ratings, we will transform pooled RR estimates and 95% CIs into absolute risk differences using the corresponding control event rate (Schünemann et al. 2022). For this GRADE-focused evaluation, we will compare (a) the original analysis and (b) the flipped-only analysis (i.e., using the flipped RR directly, without reciprocal re-expression). The control event rate for each meta-analysis will be estimated using a random-effects binomial-normal generalized linear mixed model with a logit link, fitted to the study-specific control-group event counts and denominators for the corresponding outcome definition. If this proportion meta-analysis fails to converge or cannot be estimated because of degenerate data, we will use the aggregate control event rate, calculated as the total number of events divided by the total number of participants in the control groups. We will benchmark these absolute effects against the GRADE thresholds of 13, 32, and 62 events per 1000 persons, which mark the transitions between trivial, small, moderate, and large effects (Wiercioch et al. 2025). For each orientation, we will count how many thresholds are crossed by the ARD 95% CI, then compare these counts and summarize their difference (flipped minus original).
 
 For effect-estimate agreement plots, we will re-express the flipped pooled RR in the orientation of the original outcome by taking its reciprocal, so that values below or above 1 indicate effects in the same direction as in the original analysis. We denote RRo as the original pooled RR, RRflip as the flipped pooled RR before reciprocal re-expression, and RRf as the reciprocal of RRflip (RRf \= 1 / RRflip). We define the ratio of risk ratios as RRR \= RRf / RRo. We will use a Bland-Altman plot on the log scale, with the x-axis defined as the mean of log(RRo) and log(RRf), and the y-axis defined as their difference, log(RRf) \- log(RRo), which equals log(RRR) \[Bland and Altman (1999)\].
 
@@ -105,6 +101,10 @@ total sample size (\<1000 vs ≥1000 participants); baseline control event rate 
 For each subgroup level, we will summarize the distribution of RRR using the median and interquartile range (IQR), and visually compare subgroup levels using a forest-style plot (point \= median RRR, horizontal line \= IQR).
 
 All analyses and visualisations will be conducted using Python or R.
+
+## Funding
+
+This work was supported by JSPS KAKENHI Grant Number 25K13447.
 
 # Reference
 
