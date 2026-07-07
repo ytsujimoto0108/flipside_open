@@ -11,3 +11,5 @@ renv/staging/
 # Python
 __pycache__/
 *.pyc
+
+.gitignore
